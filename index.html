@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Billé — Restaurant Bill Calculator</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Mono:wght@300;400;500&family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --cream: #F5F0E8;
+    --ink: #1A1208;
+    --gold: #C8962A;
+    --rust: #8B3A1A;
+    --muted: #8A7A62;
+    --card: #FDFAF4;
+    --border: #D4C8A8;
+    --shadow: rgba(26,18,8,0.12);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background-color: var(--cream);
+    font-family: 'DM Mono', monospace;
+    color: var(--ink);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 1rem;
+    background-image:
+      radial-gradient(ellipse at 10% 20%, rgba(200,150,42,0.08) 0%, transparent 50%),
+      radial-gradient(ellipse at 90% 80%, rgba(139,58,26,0.06) 0%, transparent 50%);
+  }
+
+  /* Arabic overrides */
+  body.ar { font-family: 'Cairo', sans-serif; direction: rtl; }
+  body.ar .logo { font-family: 'Cairo', sans-serif; letter-spacing: 0; }
+  body.ar .logo span { font-style: normal; }
+  body.ar .tagline { letter-spacing: 0; }
+  body.ar label { letter-spacing: 0; }
+  body.ar .card-header { letter-spacing: 0; }
+  body.ar .calc-btn { letter-spacing: 0; font-family: 'Cairo', sans-serif; }
+  body.ar .receipt-title { letter-spacing: 0; }
+  body.ar .stamp { letter-spacing: 0; }
+  body.ar .total-label { font-family: 'Cairo', sans-serif; font-style: normal; }
+  body.ar .total-value { font-family: 'Cairo', sans-serif; }
+  body.ar input { font-family: 'Cairo', sans-serif; text-align: right; }
+  body.ar .prefix { left: auto; right: 0.9rem; }
+  body.ar .suffix { right: auto; left: 0.9rem; }
+  body.ar input[type="number"] { padding: 0.75rem 2.2rem 0.75rem 2.5rem; }
+
+  /* Language toggle */
+  .lang-toggle {
+    position: fixed;
+    top: 1.2rem;
+    right: 1.2rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    user-select: none;
+    z-index: 10;
+  }
+  body.ar .lang-toggle { right: auto; left: 1.2rem; }
+  .lang-toggle input[type="checkbox"] { display: none; }
+  .toggle-track {
+    width: 44px; height: 24px;
+    background: var(--border);
+    border-radius: 12px;
+    position: relative;
+    transition: background 0.25s;
+  }
+  .toggle-track::after {
+    content: '';
+    position: absolute;
+    top: 3px; left: 3px;
+    width: 18px; height: 18px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 0.25s;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+  }
+  .lang-toggle input:checked + .toggle-track { background: var(--gold); }
+  .lang-toggle input:checked + .toggle-track::after { transform: translateX(20px); }
+  .toggle-label {
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    text-transform: uppercase;
+    font-family: 'DM Mono', monospace;
+  }
+
+  header {
+    text-align: center;
+    margin-bottom: 2.5rem;
+    animation: fadeDown 0.6s ease both;
+  }
+
+  .logo {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(2.8rem, 7vw, 4.5rem);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+    line-height: 1;
+  }
+  .logo span { color: var(--gold); font-style: italic; }
+
+  .tagline {
+    font-size: 0.72rem;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-top: 0.5rem;
+  }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    width: 100%;
+    max-width: 520px;
+    box-shadow: 0 8px 40px var(--shadow), 0 1px 0 rgba(200,150,42,0.3);
+    overflow: hidden;
+    animation: fadeUp 0.7s ease 0.1s both;
+  }
+
+  .card-header {
+    background: var(--ink);
+    color: var(--cream);
+    padding: 1.2rem 2rem;
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+  }
+  .card-header::before { content: '✦'; color: var(--gold); font-size: 0.85rem; flex-shrink: 0; }
+
+  .form-body {
+    padding: 2rem 2rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.4rem;
+  }
+
+  .field { display: flex; flex-direction: column; gap: 0.4rem; }
+
+  label {
+    font-size: 0.65rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .input-wrap { position: relative; display: flex; align-items: center; }
+
+  .prefix {
+    position: absolute; left: 0.9rem;
+    font-size: 0.85rem; color: var(--muted);
+    pointer-events: none; font-family: 'DM Mono', monospace;
+  }
+  .suffix {
+    position: absolute; right: 0.9rem;
+    font-size: 0.85rem; color: var(--muted);
+    pointer-events: none; font-family: 'DM Mono', monospace;
+  }
+
+  input[type="number"] {
+    width: 100%;
+    padding: 0.75rem 2.5rem 0.75rem 2.2rem;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    background: #fff;
+    font-family: 'DM Mono', monospace;
+    font-size: 1rem;
+    color: var(--ink);
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; }
+  input[type="number"]:focus {
+    border-color: var(--gold);
+    box-shadow: 0 0 0 3px rgba(200,150,42,0.15);
+  }
+
+  .divider { border: none; border-top: 1px dashed var(--border); margin: 0.4rem 0; }
+
+  .row-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+
+  .calc-btn {
+    width: 100%;
+    padding: 0.9rem;
+    background: var(--ink);
+    color: var(--cream);
+    border: none;
+    border-radius: 2px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+    margin-top: 0.4rem;
+  }
+  .calc-btn:hover { background: var(--rust); }
+  .calc-btn:active { transform: scale(0.98); }
+
+  .receipt {
+    border-top: 1px solid var(--border);
+    padding: 1.5rem 2rem 2rem;
+    display: none;
+    animation: fadeUp 0.4s ease both;
+  }
+  .receipt.visible { display: block; }
+
+  .receipt-title {
+    font-size: 0.62rem;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+  }
+  .receipt-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  .receipt-line {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 0.4rem 0;
+    font-size: 0.8rem;
+    border-bottom: 1px dotted rgba(212,200,168,0.5);
+  }
+  .receipt-line:last-of-type { border-bottom: none; }
+  .receipt-label { color: var(--muted); }
+  .receipt-value { font-weight: 500; }
+
+  .receipt-total {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 2px solid var(--ink);
+  }
+
+  .total-label {
+    font-family: 'Playfair Display', serif;
+    font-size: 1rem;
+    font-style: italic;
+  }
+
+  .total-value {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: -0.02em;
+  }
+
+  .stamp {
+    text-align: center;
+    margin-top: 1.2rem;
+    font-size: 0.6rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--border);
+  }
+
+  @keyframes fadeDown {
+    from { opacity: 0; transform: translateY(-16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(14px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  input.error { border-color: var(--rust) !important; }
+  .err-msg { font-size: 0.62rem; color: var(--rust); margin-top: 0.2rem; display: none; }
+  .err-msg.show { display: block; }
+</style>
+</head>
+<body id="body">
+
+<!-- Language Toggle -->
+<label class="lang-toggle" title="Switch language">
+  <input type="checkbox" id="langToggle" onchange="toggleLang()">
+  <div class="toggle-track"></div>
+  <span class="toggle-label" id="toggleLabel">عربي</span>
+</label>
+
+<header>
+  <div class="logo" id="logo">Bill<span>é</span></div>
+  <p class="tagline" id="tagline">Restaurant Bill Calculator</p>
+</header>
+
+<div class="card">
+  <div class="card-header" id="card-header">Enter Your Bill Details</div>
+
+  <div class="form-body">
+
+    <div class="field">
+      <label id="lbl-price">Item Price (EGP)</label>
+      <div class="input-wrap">
+        <span class="prefix">£</span>
+        <input type="number" id="price" placeholder="0.00" min="0" step="0.01">
+      </div>
+      <span class="err-msg" id="price-err">Please enter a valid price.</span>
+    </div>
+
+    <hr class="divider">
+
+    <div class="row-inputs">
+      <div class="field">
+        <label id="lbl-vat">VAT Rate</label>
+        <div class="input-wrap">
+          <input type="number" id="tax" placeholder="14" min="0" max="100" step="0.1" style="padding-right:2rem">
+          <span class="suffix">%</span>
+        </div>
+        <span class="err-msg" id="tax-err">0–100% only.</span>
+      </div>
+
+      <div class="field">
+        <label id="lbl-svc">Service Charge</label>
+        <div class="input-wrap">
+          <input type="number" id="service" placeholder="12" min="0" max="100" step="0.1" style="padding-right:2rem">
+          <span class="suffix">%</span>
+        </div>
+        <span class="err-msg" id="svc-err">0–100% only.</span>
+      </div>
+    </div>
+
+    <button class="calc-btn" id="calc-btn" onclick="calculate()">Calculate Total ✦</button>
+  </div>
+
+  <!-- Receipt -->
+  <div class="receipt" id="receipt">
+    <div class="receipt-title" id="receipt-title">Your Receipt</div>
+
+    <div class="receipt-line">
+      <span class="receipt-label" id="lbl-subtotal">Subtotal</span>
+      <span class="receipt-value" id="r-subtotal">—</span>
+    </div>
+    <div class="receipt-line">
+      <span class="receipt-label" id="r-vat-label">VAT (—%)</span>
+      <span class="receipt-value" id="r-vat">—</span>
+    </div>
+    <div class="receipt-line">
+      <span class="receipt-label" id="r-svc-label">Service (—%)</span>
+      <span class="receipt-value" id="r-svc">—</span>
+    </div>
+
+    <div class="receipt-total">
+      <span class="total-label" id="total-label">Total Due</span>
+      <span class="total-value" id="r-total">—</span>
+    </div>
+
+    <div class="stamp" id="stamp">✦ Thank you for dining with us ✦</div>
+  </div>
+</div>
+
+<script>
+  const strings = {
+    en: {
+      toggleLabel:  'عربي',
+      logo:         'Bill<span>é</span>',
+      tagline:      'Restaurant Bill Calculator',
+      cardHeader:   'Enter Your Bill Details',
+      lblPrice:     'Item Price (EGP)',
+      lblVat:       'VAT Rate',
+      lblSvc:       'Service Charge',
+      calcBtn:      'Calculate Total ✦',
+      receiptTitle: 'Your Receipt',
+      lblSubtotal:  'Subtotal',
+      totalLabel:   'Total Due',
+      stamp:        '✦ Thank you for dining with us ✦',
+      errPrice:     'Please enter a valid price.',
+      errTax:       '0–100% only.',
+      errSvc:       '0–100% only.',
+      vatLabel:     pct => `VAT (${pct}%)`,
+      svcLabel:     pct => `Service (${pct}%)`,
+    },
+    ar: {
+      toggleLabel:  'EN',
+      logo:         'بيليه',
+      tagline:      'حاسبة فاتورة المطعم',
+      cardHeader:   'أدخل تفاصيل الفاتورة',
+      lblPrice:     'سعر الطلب (ج.م)',
+      lblVat:       'نسبة ضريبة القيمة المضافة',
+      lblSvc:       'رسوم الخدمة',
+      calcBtn:      '✦ احسب الإجمالي',
+      receiptTitle: 'الفاتورة',
+      lblSubtotal:  'المجموع الجزئي',
+      totalLabel:   'الإجمالي المستحق',
+      stamp:        '✦ شكراً لتناولك الطعام معنا ✦',
+      errPrice:     'يرجى إدخال سعر صحيح.',
+      errTax:       '0–100% فقط.',
+      errSvc:       '0–100% فقط.',
+      vatLabel:     pct => `ض.ق.م (${pct}%)`,
+      svcLabel:     pct => `خدمة (${pct}%)`,
+    }
+  };
+
+  function toggleLang() {
+    const body = document.getElementById('body');
+    const ar = body.classList.toggle('ar');
+    const lang = ar ? 'ar' : 'en';
+    document.documentElement.lang = lang;
+    document.documentElement.dir  = ar ? 'rtl' : 'ltr';
+    applyStrings(lang);
+    if (document.getElementById('receipt').classList.contains('visible')) calculate();
+  }
+
+  function applyStrings(lang) {
+    const s = strings[lang];
+    document.getElementById('toggleLabel').textContent   = s.toggleLabel;
+    document.getElementById('logo').innerHTML            = s.logo;
+    document.getElementById('tagline').textContent       = s.tagline;
+    document.getElementById('card-header').textContent   = s.cardHeader;
+    document.getElementById('lbl-price').textContent     = s.lblPrice;
+    document.getElementById('lbl-vat').textContent       = s.lblVat;
+    document.getElementById('lbl-svc').textContent       = s.lblSvc;
+    document.getElementById('calc-btn').textContent      = s.calcBtn;
+    document.getElementById('receipt-title').textContent = s.receiptTitle;
+    document.getElementById('lbl-subtotal').textContent  = s.lblSubtotal;
+    document.getElementById('total-label').textContent   = s.totalLabel;
+    document.getElementById('stamp').textContent         = s.stamp;
+    document.getElementById('price-err').textContent     = s.errPrice;
+    document.getElementById('tax-err').textContent       = s.errTax;
+    document.getElementById('svc-err').textContent       = s.errSvc;
+  }
+
+  function fmt(n) {
+    return '£' + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  }
+
+  function validate() {
+    let ok = true;
+    const price = document.getElementById('price');
+    const tax   = document.getElementById('tax');
+    const svc   = document.getElementById('service');
+
+    [price, tax, svc].forEach(el => el.classList.remove('error'));
+    document.querySelectorAll('.err-msg').forEach(e => e.classList.remove('show'));
+
+    const priceVal = parseFloat(price.value);
+    if (price.value === '' || isNaN(priceVal) || priceVal < 0) {
+      price.classList.add('error');
+      document.getElementById('price-err').classList.add('show');
+      ok = false;
+    }
+
+    const taxVal = parseFloat(tax.value);
+    if (tax.value === '' || isNaN(taxVal) || taxVal < 0 || taxVal > 100) {
+      tax.classList.add('error');
+      document.getElementById('tax-err').classList.add('show');
+      ok = false;
+    }
+
+    const svcVal = parseFloat(svc.value);
+    if (svc.value === '' || isNaN(svcVal) || svcVal < 0 || svcVal > 100) {
+      svc.classList.add('error');
+      document.getElementById('svc-err').classList.add('show');
+      ok = false;
+    }
+
+    return ok ? { price: priceVal, tax: taxVal, svc: svcVal } : null;
+  }
+
+  function calculate() {
+    const vals = validate();
+    if (!vals) return;
+
+    const lang = document.getElementById('body').classList.contains('ar') ? 'ar' : 'en';
+    const s    = strings[lang];
+
+    // Order: subtotal → VAT → service on (subtotal + VAT)
+    const subtotal = vals.price;
+    const vatAmt   = subtotal * (vals.tax / 100);
+    const svcAmt   = (subtotal + vatAmt) * (vals.svc / 100);
+    const total    = subtotal + vatAmt + svcAmt;
+
+    document.getElementById('r-subtotal').textContent  = fmt(subtotal);
+    document.getElementById('r-vat-label').textContent = s.vatLabel(vals.tax);
+    document.getElementById('r-vat').textContent       = fmt(vatAmt);
+    document.getElementById('r-svc-label').textContent = s.svcLabel(vals.svc);
+    document.getElementById('r-svc').textContent       = fmt(svcAmt);
+    document.getElementById('r-total').textContent     = fmt(total);
+
+    const receipt = document.getElementById('receipt');
+    receipt.classList.remove('visible');
+    void receipt.offsetWidth;
+    receipt.classList.add('visible');
+    receipt.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Enter') calculate();
+  });
+</script>
+</body>
+</html>
